@@ -1,0 +1,68 @@
+#include <WiFi.h>
+#include "ThingSpeak.h"
+#include "DHT.h"
+
+#define DHTPIN 4
+#define DHTTYPE DHT11
+#define SOIL_PIN 34
+#define RELAY_PIN 26
+
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+unsigned long channelID = YOUR_CHANNEL_ID;
+const char* writeAPIKey = "YOUR_WRITE_API_KEY";
+
+WiFiClient client;
+DHT dht(DHTPIN, DHTTYPE);
+
+int soilValue;
+float temperature, humidity;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(SOIL_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);
+
+  dht.begin();
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWi-Fi connected!");
+  ThingSpeak.begin(client);
+}
+
+void loop() {
+  soilValue = analogRead(SOIL_PIN);
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+
+  Serial.print("Soil Moisture: ");
+  Serial.println(soilValue);
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print("°C  Humidity: ");
+  Serial.print(humidity);
+  Serial.println("%");
+
+  if (soilValue > 2500) {
+    digitalWrite(RELAY_PIN, LOW);
+    Serial.println("Pump ON");
+  } else {
+    digitalWrite(RELAY_PIN, HIGH);
+    Serial.println("Pump OFF");
+  }
+
+  ThingSpeak.setField(1, soilValue);
+  ThingSpeak.setField(2, temperature);
+  ThingSpeak.setField(3, humidity);
+
+  int statusCode = ThingSpeak.writeFields(channelID, writeAPIKey);
+  if (statusCode == 200) Serial.println("Data sent to ThingSpeak");
+  else Serial.println("Error sending data");
+
+  delay(15000);
+}
